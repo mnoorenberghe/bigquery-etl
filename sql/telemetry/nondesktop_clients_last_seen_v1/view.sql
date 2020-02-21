@@ -26,9 +26,9 @@ SELECT
   client_id,
   days_seen_bits,
   days_since_seen,
-  days_created_profile_bits,
+  1 << days_since_created_profile AS days_created_profile_bits,
   days_since_created_profile,
-  app_name,
+  'Fenix' AS app_name,
   os,
   os_version,
   normalized_channel,
@@ -38,4 +38,25 @@ SELECT
   NULL AS distribution_id,
   app_display_version AS app_version
 FROM
-  `moz-fx-data-shared-prod.org_mozilla_fenix.clients_last_seen`
+  `moz-fx-data-shared-prod.org_mozilla_firefox.clients_last_seen`
+  --
+UNION ALL
+  --
+SELECT
+  submission_date,
+  client_id,
+  days_seen_bits,
+  days_since_seen,
+  1 << days_since_created_profile AS days_created_profile_bits,
+  days_since_created_profile,
+  'FirefoxReality' AS app_name,
+  os,
+  os_version,
+  normalized_channel,
+  NULL AS campaign,
+  country,
+  locale,
+  distribution_channel_name AS distribution_id,
+  app_display_version AS app_version
+FROM
+  `moz-fx-data-shared-prod.org_mozilla_vrbrowser.clients_last_seen`
