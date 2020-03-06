@@ -4,6 +4,7 @@ from argparse import ArgumentParser
 from datetime import datetime, timedelta
 from functools import partial
 from multiprocessing import Pool
+import json
 import os.path
 import subprocess
 import sys
@@ -39,6 +40,11 @@ parser.add_argument(
     type=fromisoformat,
     help="The last date for which the query will be submitted,"
     " defaults to today in utc",
+)
+parser.add_argument(
+    "--skip_existing",
+    action="store_true",
+    help="Maximum number of queries which may be submitted at once",
 )
 parser.add_argument(
     "--max_procs",
@@ -110,20 +116,47 @@ def main():
     args, unknown_args = parser.parse_known_args()
     # Unknown args should be passed as query_options.
     args.query_options.extend(unknown_args)
+    entrypoint = os.path.join(os.path.dirname(sys.argv[0]), "entrypoint")
     target = partial(
         query,
-        entrypoint=os.path.join(os.path.dirname(sys.argv[0]), "entrypoint"),
+        entrypoint=entrypoint,
         destination_table=args.destination_table,
         query_options=args.query_options,
         query_file=args.query_file,
     )
+    days = date_range(args.start, args.end)
+    if args.skip_existing:
+        date_format = "%Y%m%d"
+        proc = subprocess.Popen(
+            [
+                entrypoint,
+                "bq",
+                "query",
+                "--max_rows=" + str(abs((args.start - args.end).days)),
+                "--use_legacy_sql",
+                "--format=json",
+                "SELECT partition_id FROM ["
+                + args.destination_table
+                + '$__PARTITIONS_SUMMARY__] WHERE partition_id BETWEEN "'
+                + min(args.start, args.end).strftime(date_format)
+                + '" AND "'
+                + max(args.start, args.end).strftime(date_format)
+                + '"',
+            ],
+            stdout=subprocess.PIPE,
+        )
+        stdout, _ = proc.communicate()
+        if proc.returncode != 0:
+            sys.stdout.write(stdout)
+            sys.stdout.flush()
+            sys.exit(proc.returncode)
+        existing = {row["partition_id"] for row in json.loads(stdout.decode())}
+        days = (day for day in days if day.strftime(date_format) not in existing)
     if args.max_procs == 1:
-        for day in date_range(args.start, args.end):
+        for day in days:
             target(day)
     else:
-        Pool(processes=args.max_procs).map(
-            target, date_range(args.start, args.end), chunksize=1
-        )
+        Pool(processes=args.max_procs).map(target, days, chunksize=1)
 
 
 if __name__ == "__main__":
