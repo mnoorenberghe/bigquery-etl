@@ -74,6 +74,7 @@ main_events AS (
     event_map_values,
     experiments,
     event_process,
+    build_id,
     subsession_id,
     session_start_time,
     session_id
@@ -93,6 +94,7 @@ event_events AS (
     locale,
     app_name,
     app_version,
+    build_id,
     os,
     os_version,
     `timestamp`,
@@ -105,6 +107,7 @@ event_events AS (
     event_map_values,
     experiments,
     event_process,
+    build_id,
     subsession_id,
     session_start_time,
     session_id
